@@ -8,6 +8,7 @@ import math
 from typing import Tuple, List, Any, Dict
 from core.state import State
 from core.problem import CommuteProblem
+import random
 
 EPS = 1e-9
 
@@ -36,6 +37,7 @@ class LocalSearchSolver(ABC):
         self.problem = problem
         self.params: Dict[str, Any] = kwargs
         self.history: List[float] = []
+        self.rng = random.Random()
 
     @abstractmethod
     def solve(self) -> Tuple[State, float]:
