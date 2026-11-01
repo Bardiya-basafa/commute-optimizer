@@ -117,7 +117,7 @@ def blend_time(t1: float, t2: float, problem: CommuteProblem) -> float:
     return snap_time(random.uniform(lo, hi), problem)
 
 
-def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
+def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: random.Random) -> State:
     """
     Recombines structural features from two parent configurations into an offspring.
 
@@ -157,14 +157,14 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
                 candidates.append(child)
 
     if candidates:
-        child = State(random.choice(candidates), t)
+        child = State(rng.choice(candidates), t)
         if problem.is_valid_state(child):
             return child
 
     # Fallback: parents share no usable junction -> mutate one parent.
-    base = State(random.choice((p1, p2)), t)
+    base = State(rng.choice((p1, p2)), t)
     neighbors = get_neighbors(base, problem)
-    return random.choice(neighbors) if neighbors else base
+    return rng.choice(neighbors) if neighbors else base
 
 
 def random_path(

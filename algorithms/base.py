@@ -38,6 +38,8 @@ class LocalSearchSolver(ABC):
         self.params: Dict[str, Any] = kwargs
         self.history: List[float] = []
         self.rng = random.Random()
+    
+    
 
     @abstractmethod
     def solve(self) -> Tuple[State, float]:
