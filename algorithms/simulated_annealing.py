@@ -3,8 +3,10 @@ algorithms/simulated_annealing.py
 Stochastic optimization governed by a temperature schedule.
 """
 
+import math
+import random
 from typing import Tuple
-from algorithms.base import LocalSearchSolver
+from algorithms.base import LocalSearchSolver, Tracker, EPS
 from core.state import State
 from core.problem import CommuteProblem
 from algorithms.operators import get_neighbors
@@ -17,6 +19,7 @@ class SimulatedAnnealingSolver(LocalSearchSolver):
         self.cooling_rate: float = self.params.get("cooling_rate", 0.995)
         self.min_temp: float = self.params.get("min_temp", 1e-3)
         self.max_iterations: int = self.params.get("max_iterations", 2000)
+        self.rng = random.Random()
 
     def solve(self) -> Tuple[State, float]:
         """
@@ -33,4 +36,25 @@ class SimulatedAnnealingSolver(LocalSearchSolver):
         - Ignoring the temperature parameter or turning this into pure hill climbing.
         """
         # TODO: Implement Simulated Annealing
-        raise NotImplementedError("Implement solve() in algorithms/simulated_annealing.py")
+        f = self.problem.evaluate
+        tr = Tracker(self.problem)
+        T = self.initial_temp
+        cur = self.problem.generate_initial_state()
+        cur_cost = f(cur)
+        for _ in range(self.max_iterations):
+            if T < self.min_temp:
+                break
+
+            nxt = get_neighbors(cur, self.problem)
+            nxt = self.rng.choice(nxt)
+            nxt_cost = f(cur)
+
+            if nxt_cost < math.inf:
+                dE = nxt_cost - cur_cost
+                if dE <= 0 or self.rng.random() < math.exp(-dE / T):
+                    cur, cur_cost = nxt, nxt_cost
+                    tr.offer(cur, cur_cost)
+
+            T *= self.cooling_rate
+            tr.tick()
+        return tr.result()

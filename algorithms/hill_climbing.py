@@ -7,31 +7,10 @@ from collections import deque
 import math
 import random
 from typing import List, Tuple
-from algorithms.base import LocalSearchSolver
+from algorithms.base import LocalSearchSolver, Tracker, EPS
 from core.state import State
 from core.problem import CommuteProblem
 from algorithms.operators import get_neighbors, random_state
-
-EPS = 1e-9
-
-
-class _Tracker:
-
-    def __init__(self, problem: CommuteProblem):
-        self.problem = problem
-        self.best, self.best_cost = None, math.inf
-        self.history: List[float] = []
-        self.fount_at = 0
-
-    def offer(self, s: State, c: float) -> None:
-        if c < self.best_cost - EPS:
-            self.best, self.best_cost, self.fount_at = s, c, len(self.history)
-
-    def tick(self) -> None:
-        self.history.append(self.best_cost)
-
-    def result(self):
-        return (self.best, self.best_cost)
 
 
 class HillClimbingSolver(LocalSearchSolver):
@@ -56,7 +35,7 @@ class HillClimbingSolver(LocalSearchSolver):
         - Looping indefinitely on flat plateaus.
         """
 
-        tr = _Tracker(self.problem)
+        tr = Tracker(self.problem)
         f = self.problem.evaluate
 
         for restart in range(self.max_restarts):
