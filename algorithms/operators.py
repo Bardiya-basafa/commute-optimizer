@@ -4,7 +4,7 @@ Defines candidate neighborhood generation and genetic recombination operators.
 """
 
 import random
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 from core.state import State
 from core.problem import CommuteProblem
 
@@ -66,10 +66,10 @@ def route_moves(s: State, problem: CommuteProblem) -> List[State]:
     for i in range(len(p) - 1):
         for j in range(i + 1, min(len(p), i + MAX_SPAN + 1)):
             # Detour must not reuse any node kept from the rest of the path.
-            forbidden = set(p[:i]) | set(p[j + 1:])
+            forbidden = set(p[:i]) | set(p[j + 1 :])
             for seg in simple_paths(problem, p[i], p[j], forbidden, MAX_DETOUR):
-                if seg != p[i:j + 1]:
-                    out.append(State(p[:i] + seg + p[j + 1:], s.departure_time))
+                if seg != p[i : j + 1]:
+                    out.append(State(p[:i] + seg + p[j + 1 :], s.departure_time))
     return out
 
 
@@ -165,3 +165,42 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
     base = State(random.choice((p1, p2)), t)
     neighbors = get_neighbors(base, problem)
     return random.choice(neighbors) if neighbors else base
+
+
+def random_path(
+    problem: CommuteProblem, rng: random.Random
+) -> Optional[Tuple[str, ...]]:
+    dst = problem.destination
+    first = list(problem.network.get_neighbors(problem.origin))
+    rng.shuffle(first)
+    stack = [(problem.origin, iter(first))]
+    on_path = {problem.origin}
+    while stack:
+
+        node, untried = stack[-1]
+
+        if node == dst:
+            return tuple(n for n, _ in stack)
+
+        nxt = next((v for v in untried if v not in on_path), None)
+        if nxt is None:
+            stack.pop()
+            on_path.discard(node)
+            continue
+
+        succ = list(problem.network.get_neighbors(nxt))
+        rng.shuffle(succ)
+        stack.append((nxt, iter(succ)))
+        on_path.add(nxt)
+
+    return None
+
+
+def random_state(problem: CommuteProblem, rng: random.Random) -> State:
+    """random_path + a random time from problem.time_domain()."""
+    path = random_path(problem=problem, rng=rng)
+
+    if path is None:
+        return problem.initial_state()
+
+    return State(path, rng.choice(problem.get_valid_time_domain()))
