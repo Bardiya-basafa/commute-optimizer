@@ -1,0 +1,1191 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black}
+
+% ---- fonts & Persian support (polyglossia must come after hyperref) ----
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{english}
+\setotherlanguage{persian}
+\newfontfamily\persianfont[Script=Arabic,Scale=1.05]{Amiri}
+\newfontfamily\persianfontsf[Script=Arabic,Scale=1.05]{Amiri}
+\newfontfamily\persianfonttt[Script=Arabic,Scale=1.05]{Amiri}
+\newcommand{\fa}[1]{\textpersian{#1}}
+
+% ---- code listings ----
+\definecolor{codebg}{gray}{0.96}
+\definecolor{codekw}{RGB}{0,70,150}
+\definecolor{codecm}{RGB}{90,120,90}
+\definecolor{codestr}{RGB}{160,60,30}
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecm}\itshape,
+  stringstyle=\color{codestr},
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, columns=fullflexible,
+  showstringspaces=false, aboveskip=8pt, belowskip=8pt
+}
+
+\newcommand{\col}[1]{\texttt{#1}}
+\setlist{itemsep=2pt,topsep=4pt}
+\setlength{\emergencystretch}{2em}
+\renewcommand{\arraystretch}{1.18}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Data Mining -- Mini-Project 1}
+\rhead{Omid Basafa (403521078)}
+\cfoot{\thepage}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------------ title page ---------------------------
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+  \includegraphics[width=0.28\textwidth]{iust-logo.png}\par
+  \vspace{0.8cm}
+  {\Large Iran University of Science and Technology\par}
+  \vspace{0.3cm}
+  {\large School of Computer Engineering\par}
+  \vspace{1.6cm}
+  {\Huge\bfseries Data Mining\par}
+  \vspace{0.6cm}
+  {\LARGE Mini-Project 1: Data Autopsy\par}
+  \vspace{0.3cm}
+  {\large Exploring, auditing and cleaning \texttt{iran\_poi\_raw.csv}\par}
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{Student name:}   & Omid Basafa \\[4pt]
+    \textbf{Student number:} & 403521078 \\
+  \end{tabular}
+  \vfill
+  {\large \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\setcounter{section}{-1}   % Introduction = 0, so section numbers match the step numbers
+\section{Introduction}
+
+This report describes the analysis of \col{iran\_poi\_raw.csv}, a raw, intentionally
+uncleaned dataset of \textbf{297{,}152 real points of interest (POIs) in Iran}, such as
+restaurants, mosques, schools, banks, parks and doctors' offices.
+The data was extracted from OpenStreetMap (OSM) through the Geofabrik extract.
+It was entered by volunteer OSM mappers from 2007 until today, with no central quality
+control. The file is about 48\,MB and has 28 columns.
+
+All work was done in a single Jupyter notebook (\col{main.ipynb}) with
+\textbf{Python 3}, \textbf{pandas}, \textbf{NumPy}, \textbf{Matplotlib} and the standard
+modules \col{re} (regular expressions) and \col{json}.
+For each step this report gives the method, the code idea, the output, and an interpretation
+of the result.
+
+\subsection{The dataset}
+
+\begin{table}[H]
+\centering
+\caption{Columns of \col{iran\_poi\_raw.csv}.}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.3cm}X}
+\toprule
+\textbf{Column(s)} & \textbf{Meaning} \\
+\midrule
+\col{osm\_type}, \col{osm\_id} & Identify the OSM object (node or way, and its id). \\
+\col{version} & Number of times the object has been edited (the maximum in the file is 50). \\
+\col{edit\_date} & Date of the \emph{last} change. \\
+\col{lat}, \col{lon} & Geographic position. \\
+\col{main\_key}, \col{main\_value} & Type of the place, e.g.\ \col{amenity} (category) / \col{restaurant} (sub-category). \\
+\col{name}, \col{name:fa}, \col{name:en} & Names, exactly as typed by the mapper. \\
+\col{addr:city}, \col{addr:street}, \col{addr:housenumber} & Address, entered without any fixed rule. \\
+\col{phone}, \col{website}, \col{opening\_hours} & Free-text contact and opening-hours fields. \\
+\col{brand}, \col{operator}, \col{cuisine}, \col{wheelchair}, \col{building}, \col{religion} & Optional descriptive tags. \\
+\col{capacity} & In theory the capacity of the place as a number. \\
+\col{n\_tags} & Total number of OSM tags of the record. \\
+\col{nearest\_hub}, \col{hub\_km} & Added by the course staff (see the note below). \\
+\col{other\_tags} & All remaining OSM tags, stored as a JSON object. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\fbox{\parbox{0.97\textwidth}{\textbf{Important note on \col{nearest\_hub}.}
+\col{nearest\_hub} assigns each record to the \emph{nearest approximate provincial center}
+using \emph{only straight-line geographic distance}, and \col{hub\_km} is that distance in km.
+This is \textbf{not an official administrative division}: a record labelled ``Tehran'' is not
+necessarily inside Tehran province. Every result in this report that uses these columns
+(Steps 6.2--6.4) should be read with this in mind.}}
+
+\vspace{0.4cm}
+A few input rows (selected columns) as loaded by \col{pd.read\_csv}:
+
+\begin{table}[H]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Sample input records (\col{df.head()}, selected columns).}
+\begin{tabular}{llrlllll}
+\toprule
+\col{osm\_type} & \col{osm\_id} & \col{version} & \col{edit\_date} & \col{main\_key} & \col{main\_value} & \col{name} & \col{nearest\_hub} \\
+\midrule
+node & 5        & 15 & 2026-08-01 & amenity & bureau\_de\_change & \fa{صرافی MP} & Tehran \\
+node & 25990999 & 5  & 2019-08-27 & amenity & toilets & \fa{دستشویی} & Tehran \\
+node & 26016253 & 10 & 2019-07-18 & amenity & pharmacy & \fa{داروخانه شبانه‌روزی قانون} & Tehran \\
+node & 26206700 & 9  & 2019-01-26 & amenity & cinema & \fa{سینما عصر جدید} & Tehran \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Overall workflow}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners, fill=blue!6, align=center, minimum height=1.25cm,
+              text width=2.25cm, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick}]
+  \node[box, fill=gray!12] (raw) {Raw CSV\\297{,}152 rows\\28 columns};
+  \node[box, right=0.45cm of raw] (s2) {Step 2\\types \&\\basic stats};
+  \node[box, right=0.45cm of s2] (s3) {Step 3\\quality audit};
+  \node[box, right=0.45cm of s3] (s4) {Step 4\\cleaning};
+  \node[box, below=1.1cm of s4] (s5) {Step 5\\Jaccard \&\\duplicates};
+  \node[box, left=0.45cm of s5] (s6) {Step 6\\statistics,\\plots, OLAP};
+  \node[box, left=0.45cm of s6, fill=green!8] (rep) {Results \&\\report};
+  \node[box, left=0.45cm of rep, fill=yellow!10] (s1) {Step 1\\task\\identification};
+  \draw[arr] (raw) -- (s2);
+  \draw[arr] (s2) -- (s3);
+  \draw[arr] (s3) -- (s4);
+  \draw[arr] (s4) -- (s5);
+  \draw[arr] (s5) -- (s6);
+  \draw[arr] (s6) -- (rep);
+  \draw[arr, dashed] (s3.south) to[bend right=25] node[midway, right, font=\scriptsize]{duplicate candidates} (s5.north west);
+\end{tikzpicture}
+\caption{Overall workflow. Step 1 is theoretical. The duplicate candidates found in
+Step 3.5 are saved to \col{candids\_duplicate.csv} and reused in Step 5.}
+\end{figure}
+
+The file is loaded with \col{phone} and \col{capacity} forced to \emph{string}:
+
+\begin{lstlisting}
+df = pd.read_csv("iran_poi_raw.csv", dtype={"capacity": str, "phone": str})
+\end{lstlisting}
+
+\noindent Without this, pandas would try to infer a numeric type: leading zeros
+and the \col{+} sign of phone numbers would be lost, and the mixed \col{capacity} column
+would be guessed into some type. We want to inspect the raw values first and clean them
+ourselves (Step 4).
+
+% =====================================================================
+\section{Step 1: Identifying the Data-Mining Tasks}
+
+\begin{table}[H]
+\centering
+\caption{Data-mining task for each of the three questions.}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{2.5cm}X}
+\toprule
+\textbf{Question} & \textbf{Task} & \textbf{Reason} \\
+\midrule
+Can the type of a place (\col{main\_value}) be guessed from its name alone?
+& \textbf{Classification}
+& The target \col{main\_value} is a \emph{categorical label} that is already known for most
+records, so a model can be trained with supervision on (name $\rightarrow$ type) examples
+and then predict the type of a new name. \\
+\midrule
+Which geographic regions have a higher density of recreational places?
+& \textbf{Clustering}
+& There is no label to predict. We want to discover dense groups of
+\col{leisure}/\col{tourism} points in (\col{lat}, \col{lon}) space without supervision,
+e.g.\ with a density-based algorithm such as DBSCAN. \\
+\midrule
+Which records are duplicate versions of another place?
+& \textbf{Anomaly detection}
+& Normally each real place appears once. A record that almost coincides with another one
+(same location, same type, similar name) is an \emph{abnormal} record that should be flagged.
+It can also be seen as a similarity-based grouping problem, which is how Step 5 solves it. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Step 2: Attribute Types and Basic Statistics}
+
+The data was first inspected with \col{df.shape}, \col{df.head()}, \col{df.info()},
+\col{df.dtypes} and \col{df.describe()}.
+
+\subsection{Attribute types}
+
+\begin{table}[H]
+\centering
+\caption{Attribute type of the requested columns.}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2cm}X}
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Reason} \\
+\midrule
+\col{main\_key} & Nominal & Category labels (amenity, shop, \dots) with no natural order; only $=$ / $\neq$ make sense. \\
+\col{version} & Ratio & A count of edits. It has a true zero and ratios make sense (10 edits is twice as many as 5). \\
+\col{edit\_date} & Interval & Differences between dates are meaningful (``3 years later''), but the calendar zero is arbitrary, so ratios of dates are meaningless. \\
+\col{lat} / \col{lon} & Interval & Differences in degrees are meaningful, but the zero point (equator / Greenwich) is a convention and values can be negative, so ratios are meaningless. \\
+\col{capacity} & Ratio & A number of people or vehicles. 0 really means ``no capacity'' and 100 is twice 50. \\
+\col{hub\_km} & Ratio & A distance in km, with a true zero (being at the hub) and meaningful ratios. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Basic statistics}
+
+\textbf{Total number of records: 297{,}152} (28 columns).
+The share of each of the seven \col{main\_key} categories was computed with
+\col{value\_counts()} divided by the number of rows:
+
+\begin{table}[H]
+\centering
+\caption{Share of each \col{main\_key} category.}
+\begin{tabular}{lrr}
+\toprule
+\col{main\_key} & \textbf{Count} & \textbf{Percentage} \\
+\midrule
+amenity    & 138{,}493 & 46.61\% \\
+shop       & 72{,}122  & 24.27\% \\
+leisure    & 42{,}320  & 14.24\% \\
+office     & 25{,}972  & 8.74\%  \\
+tourism    & 12{,}220  & 4.11\%  \\
+craft      & 3{,}911   & 1.32\%  \\
+healthcare & 2{,}114   & 0.71\%  \\
+\midrule
+\textbf{Total} & \textbf{297{,}152} & \textbf{100\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The percentage of missing values per column was computed with:
+
+\begin{lstlisting}
+missing = (df.isna().mean() * 100).round(2).sort_values(ascending=True)
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Percentage of missing values in each column.}
+\begin{tabular}{lr@{\hspace{1.6cm}}lr}
+\toprule
+\textbf{Column} & \textbf{Missing \%} & \textbf{Column} & \textbf{Missing \%} \\
+\midrule
+\col{capacity}         & 99.71 & \col{opening\_hours} & 88.34 \\
+\col{wheelchair}       & 99.23 & \col{addr:city}      & 84.81 \\
+\col{cuisine}          & 98.69 & \col{name:en}        & 84.62 \\
+\col{name:fa}          & 97.55 & \col{phone}          & 84.35 \\
+\col{addr:housenumber} & 96.95 & \col{addr:street}    & 82.02 \\
+\col{website}          & 96.12 & \col{other\_tags}    & 65.10 \\
+\col{brand}            & 95.35 & \col{name}           & 24.76 \\
+\col{religion}         & 94.14 & \multicolumn{2}{l}{\textit{The other 11 columns: 0.00}} \\
+\col{operator}         & 92.00 & \multicolumn{2}{l}{\small(\col{osm\_type}, \col{osm\_id}, \col{version}, \col{edit\_date},} \\
+\col{building}         & 88.86 & \multicolumn{2}{l}{\small\phantom{(}\col{lat}, \col{lon}, \col{main\_key}, \col{main\_value},} \\
+                       &       & \multicolumn{2}{l}{\small\phantom{(}\col{n\_tags}, \col{nearest\_hub}, \col{hub\_km})} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/missing.png}
+\caption{Missing percentage per column.}
+\end{figure}
+
+Only the fields that are always produced by the extraction are complete. All the
+descriptive tags are mostly empty, and even \col{name} is missing in about a quarter of
+the records.
+
+\subsection{Why are \col{capacity} and \col{cuisine} more than 95\% empty?}
+
+To check whether the empty values are random, we looked at the overall fill rate of
+\col{cuisine} (only \textbf{1.31\%} of all records) and at which kinds of places actually
+have a \col{capacity}:
+
+\begin{table}[H]
+\centering
+\caption{\col{main\_value} of the 854 records that have a \col{capacity} (top rows).}
+\begin{tabular}{lr@{\hspace{1.2cm}}lr}
+\toprule
+\col{main\_value} & \textbf{Count} & \col{main\_value} & \textbf{Count} \\
+\midrule
+parking        & 524 & shelter            & 22 \\
+restaurant     & 87  & fast\_food         & 17 \\
+parking\_space & 70  & camp\_site         & 12 \\
+cafe           & 33  & school             & 11 \\
+taxi           & 27  & \textit{others}    & 51 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A high missing rate here is \textbf{not necessarily a data-collection error}:
+\begin{itemize}
+  \item \textbf{Not applicable (structurally missing).} \col{cuisine} only makes sense for
+  food places (restaurant, cafe, fast\_food). A mosque, a bank or a park has no cuisine, so an
+  empty value is the \emph{correct} value there. In the same way \col{capacity} is mostly
+  used for parking (524 of 854), \col{religion} only for places of worship, and \col{brand}
+  only for chain stores.
+  \item \textbf{Optional tags in a volunteer project.} In OSM only the main tag is
+  essential. Every other tag is optional, and many mappers only add a point and a name.
+  Details stay empty even when they would apply.
+\end{itemize}
+So the values are \emph{missing not at random}: whether a value is present depends on the
+type of the place and on how much effort the mapper put in, not on a failure of the
+collection system.
+
+% =====================================================================
+\section{Step 3: Data Quality}
+
+\subsection{How messy is \col{addr:city}?}
+
+Only 15.19\% of the records have \col{addr:city}, yet the column has
+\textbf{2{,}525 unique values}, far more than the number of cities in Iran.
+All values containing a spelling of Tehran were found with a case-insensitive regex
+(\col{tehran|teheran|\fa{تهران}|\fa{طهران}}):
+
+\begin{table}[H]
+\centering
+\caption{Different written forms of the city of Tehran in \col{addr:city}.}
+\begin{tabular}{lr@{\hspace{1.2cm}}lr}
+\toprule
+\textbf{Value} & \textbf{Count} & \textbf{Value} & \textbf{Count} \\
+\midrule
+\fa{تهران}     & 6{,}110 & \col{tehran-pakdasht-hesaramir} & 12 \\
+\col{Tehran}     & 1{,}018 & \col{TEHRAN}                   & 8 \\
+\fa{شهر تهران} & 932     & \fa{منطقه ۱۴ شهر تهران}        & 6 \\
+\col{tehran}     & 408     & \fa{استان تهران}               & 5 \\
+\col{Teheran}    & 13      & \fa{تهران تجریش}               & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At least six different spellings refer to exactly the same city:
+\fa{تهران}, \col{Tehran}, \fa{شهر تهران}, \col{tehran}, \col{Teheran} and \col{TEHRAN}.
+There are also district or province forms, combined forms, and even complete addresses
+pasted into the city field (e.g.\ \fa{تهران، باغ سپهسالار، پاساژ الیزه، ...}).
+The substring search also matched \fa{تهراندشت} and \fa{تهرانسر}, which are
+\emph{different} places. This shows that simple substring matching is not enough for cleaning.
+
+\subsection{Arabic \fa{ك}/\fa{ي} instead of Persian \fa{ک}/\fa{ی}}
+
+The two forms look almost identical, but they are different Unicode code points
+(U+0643/U+064A versus U+06A9/U+06CC), so a computer treats \fa{بانك} and \fa{بانک}
+as different strings. Counting with \col{str.contains} on the \col{name} column gives:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Names containing Arabic \fa{ك} & \textbf{765} \\
+Names containing Arabic \fa{ي} & \textbf{1{,}486} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Why is this noise specific to user-generated data?}
+Volunteers type on different devices and keyboard layouts. The Arabic layout of
+Windows, older phones and some apps produces \fa{ي}/\fa{ك}, while the standard
+Persian layout produces \fa{ی}/\fa{ک}. Because both look the same on screen, the mapper
+does not notice, and OSM does not validate free text. An organization that produces data in a
+fixed format uses one input system and applies validation and normalization rules, so this kind of
+mixing does not appear. As a result, searching, grouping and string matching treat
+\fa{بانك ملي} and \fa{بانک ملی} as different values.
+
+\subsection{Invalid values in \col{capacity}}
+
+Each of the 854 non-null \col{capacity} strings was put into a category with a function
+\col{valid\_capacity} built from ordered regular-expression checks (the first match wins):
+a plain integer, an integer in Persian digits, a negative number, digits followed by a unit
+(``\fa{نفر}'' = person, ``\fa{متر}'' = metre), digits with other characters, and no digits at all.
+
+\begin{table}[H]
+\centering
+\caption{Categories of \col{capacity} values.}
+\begin{tabular}{lr}
+\toprule
+\textbf{Category} & \textbf{Count} \\
+\midrule
+valid integer (ok)       & 842 \\
+Persian digits           & 4 \\
+text instead of number   & 3 \\
+negative number          & 2 \\
+number + unit            & 2 \\
+number + extra letters   & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Invalid \col{capacity} values and their probable source.}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{4.1cm}X}
+\toprule
+\textbf{Category} & \textbf{Examples (place)} & \textbf{Probable source} \\
+\midrule
+Persian digits & \fa{۵۰} (cafe), \fa{۲۰}, \fa{۶۰} (parking), \fa{۱۰} (cafe)
+& Typed with a Persian keyboard. The value is correct but not machine-readable as a number. \\
+Negative number & $-1$ (taxi), $-50$ (restaurant)
+& $-1$ is a common placeholder for ``unknown'', and $-50$ is probably a typo. A capacity cannot be negative. \\
+Number + unit & \fa{۵ نفر} (5 persons, taxi), \fa{۸۰۰متر مربع} (800\,m$^2$, parking)
+& The user wrote a phrase instead of a number. The second one is even the \emph{wrong
+quantity}: an area instead of a number of people or cars. \\
+Number + extra letters & \fa{ضض}300 (parking space)
+& A keyboard typo: the layout was not switched before typing (\fa{ض} is on the same key as \texttt{q}). \\
+Text instead of number & \fa{مشهد} (a city), \fa{ترمینال}, \fa{مخزن (تانکر) آب حسینی} (the place's own name)
+& Content typed into the wrong field of the editor: the city or the name was put into \col{capacity}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Some syntactically valid integers are also \emph{logically} suspicious: 5 records have a
+capacity of \textbf{0}, and some values are implausible, for example an \emph{internet-taxi office}
+with 10{,}000 and a \emph{restaurant} with 5{,}000. Others, such as a 50{,}000-car parking for
+Arbaeen or a 15{,}000-seat stadium, are plausible.
+
+\subsection{Phone formats}
+
+Each phone value was assigned to a format by \col{format\_phone}.
+A helper \col{nationals} reduces a number to its \emph{national significant number}: it keeps
+only the digits, removes the country code (\col{0098} or \col{+98}) and strips the leading trunk
+\col{0}. A complete Iranian number then has 10 digits (e.g.\ \col{2126119186}).
+
+\begin{lstlisting}
+def nationals(p):
+    d = re.sub(r"\D", "", p)              # keep digits only
+    if d.startswith("0098"):
+        d = d[4:]
+    elif d.startswith("98") and p.strip().startswith("+"):
+        d = d[2:]
+    return d.lstrip("0")                  # drop trunk prefix 0
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Phone formats among the 46{,}490 non-null phones, with real samples.}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Format} & \textbf{Count} & \textbf{Real samples} \\
+\midrule
+Starts with 0, no \col{+98}            & 15{,}168 & \col{09111153844}, \col{08733779673} \\
+\col{+98} without spaces               & 14{,}537 & \col{+983132205774}, \col{+983133375777} \\
+\col{+98} with spaces                  & 11{,}537 & \col{+98 21 4423 8400}, \col{+98 21 4425 3980} \\
+Persian / Arabic digits                & 2{,}735  & \fa{۰۲۱۴۹۲۸۶۰۰۰} \\
+Several numbers in one field           & 1{,}113  & \col{+98 21 2611 9186;+98 21 2611 9187} \\
+Neither 0 nor \col{+98}                & 554      & \col{9334440337}, \col{+5138412829} \\
+Incomplete ($<8$ national digits)      & 492      & \col{+98 21 64451}, \col{+98 21 1836} \\
+With \col{-} or \col{()}               & 339      & \col{+98-511-7654476-9}, \col{+98-511-8545061-3} \\
+Not a phone number                     & 15       & \fa{رضا اسدی} (a person's name), \fa{کلینیک پوست و مو باران} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The same information appears in at least nine formats. The variations are:
+\begin{itemize}
+  \item \textbf{digits:} Persian or Latin;
+  \item \textbf{prefix:} \col{+98}, \col{0}, or none (\col{+5138412829} has lost the \col{98});
+  \item \textbf{separators:} spaces, hyphens or parentheses;
+  \item \textbf{completeness:} numbers cut off after the area code;
+  \item \textbf{other content:} several numbers in one field, or plain text.
+\end{itemize}
+\col{+98-511-...} also uses the \emph{old} 3-digit Mashhad area code.
+
+\subsection{Candidate duplicate records}
+
+\col{lat} and \col{lon} were rounded to 4 decimals (about 11\,m in latitude and 9--10\,m in
+longitude at Iran's latitudes). Records with the same rounded location \emph{and} the same
+\col{main\_value} were grouped. Every group of size $>1$ is a set of duplicate candidates,
+and a self-join turns the groups into pairs:
+
+\begin{lstlisting}
+df["lat_round"] = df["lat"].round(4)
+df["lon_round"] = df["lon"].round(4)
+keys = ["lat_round", "lon_round", "main_value"]
+group_size = df.groupby(keys)["osm_id"].transform("count")
+candids_duplicate = df[group_size > 1]
+
+d = candids_duplicate.reset_index()
+pairs = d.merge(d, on=keys, suffixes=("_1", "_2"))
+pairs = pairs[pairs["index_1"] < pairs["index_2"]]   # no (A,A), no (B,A)
+pairs.to_csv("candids_duplicate.csv", index=False)   # kept for Step 5
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Records in a duplicate group & \textbf{7{,}076} \\
+Number of groups & \textbf{3{,}245} \\
+Candidate pairs & \textbf{4{,}747} \\
+Pairs with exactly the same name & \textbf{460} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{table}[H]
+\centering
+\caption{Real examples of the same place mapped twice.}
+\begin{tabular}{llll}
+\toprule
+\textbf{Name} & \col{main\_value} & \textbf{Record 1} & \textbf{Record 2} \\
+\midrule
+\fa{کلانتری ۱۲ میدان جمهوری} & police      & node 455969203  & way 929870598 \\
+\fa{بانک تجارت}              & bank        & node 2309413230 & way 1419976030 \\
+\fa{اداره پست مرکزی}         & post\_office & node 3303523321 & way 491120128 \\
+\fa{داروخانه دکتر بهشتیان}   & pharmacy    & node 3343366958 & way 327449401 \\
+\fa{هتل نویذر}               & hotel       & node 3300670011 & node 5198144121 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A common pattern is \textbf{node + way}: one mapper put a point (node) for the place,
+and later another mapper drew the building outline (way) and tagged it again without
+removing the original point. The hotel example shows that two plain nodes can also be
+duplicates. The full candidate list was saved to \col{candids\_duplicate.csv} for Step 5.
+
+% =====================================================================
+\section{Step 4: Pre-processing and Cleaning}
+
+\subsection{Normalizing \col{addr:city}}
+
+The function \col{normalize} applies, in order:
+\begin{enumerate}
+  \item collapse repeated, leading and trailing whitespace;
+  \item replace Arabic \fa{ي}/\fa{ك} with Persian \fa{ی}/\fa{ک};
+  \item lower-case Latin letters (\col{Tehran}, \col{TEHRAN} $\rightarrow$ \col{tehran});
+  \item remove the prefix ``\fa{شهر}'' (``city'');
+  \item map the Latin name of \textbf{25 frequent cities} (more than the 10 required) to its
+  Persian form with a dictionary, e.g.\ \col{tehran}/\col{teheran} $\rightarrow$ \fa{تهران},
+  \col{isfahan}/\col{esfahan} $\rightarrow$ \fa{اصفهان}, \col{mashhad} $\rightarrow$ \fa{مشهد},
+  \col{shiraz} $\rightarrow$ \fa{شیراز}, \col{tabriz}, \col{karaj}, \col{ahvaz}/\col{ahwaz},
+  \col{qom}, \col{rasht}, \col{kermanshah}, \dots
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{Effect of normalization.}
+\begin{tabular}{lr}
+\toprule
+Unique values \textbf{before} & 2{,}525 \\
+Unique values \textbf{after}  & 2{,}281 \\
+Reduction & 244 (9.7\%) \\
+\bottomrule
+\end{tabular}
+\hspace{1cm}
+\begin{tabular}{lr}
+\toprule
+\textbf{Original} $\rightarrow$ \fa{تهران} & \textbf{Count} \\
+\midrule
+\fa{تهران} & 6{,}110 \\
+\col{Tehran} & 1{,}018 \\
+\fa{شهر تهران} & 932 \\
+\col{tehran} & 408 \\
+\col{Teheran} & 13 \\
+\col{TEHRAN} & 8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All six spellings of Tehran now become a single value (8{,}489 records).
+The remaining variety (district names, full addresses, villages) cannot be fixed with simple
+rules and would need fuzzy matching or a list of official place names.
+
+\subsection{Converting \col{capacity} to an integer}
+
+The function \col{parse\_cap}:
+\begin{enumerate}
+  \item converts Persian (\fa{۰}--\fa{۹}) and Arabic-Indic digits to Latin digits with a
+  single \col{str.maketrans} translation table;
+  \item removes the unit ``\fa{نفر}'' (persons), since a number of persons is still a valid capacity;
+  \item accepts the value only if what remains is a plain non-negative integer, checked with
+  the regex \col{[0-9]+} and \col{re.fullmatch}; otherwise it returns \col{NaN}.
+\end{enumerate}
+The result is stored as pandas' nullable integer type \col{Int64}, so integers and missing
+values can be in the same column.
+
+\begin{table}[H]
+\centering
+\caption{Result of the \col{capacity} conversion.}
+\begin{tabular}{lr}
+\toprule
+Non-null values before & 854 \\
+Converted to integer & \textbf{847} \\
+Set to \col{NaN} (cannot be converted logically) & \textbf{7} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 847 values are the 842 valid integers, the 4 Persian-digit values, and
+\fa{۵ نفر}$\,\rightarrow 5$. The 7 \col{NaN}s are:
+\begin{itemize}
+  \item the two negative numbers ($-1$, $-50$);
+  \item \fa{۸۰۰متر مربع}, which has the wrong unit (an area, not a person count);
+  \item \fa{ضض}300, where the intended number is uncertain;
+  \item the three text values (\fa{مشهد}, \fa{ترمینال}, \fa{مخزن (تانکر) آب حسینی}).
+\end{itemize}
+
+\subsection{Unifying \col{phone}}
+
+All phone digits were converted to Latin digits with the same translation table.
+The rule for a \textbf{``probably invalid'' number} is: after the conversion and after
+removing the country code and the leading 0 (\col{nationals}), a complete Iranian number has
+10 digits, so a number with \textbf{fewer than 8 digits} cannot be complete. A field may hold
+several numbers, so it is split on \col{;}, \col{,} and \col{/}, and the field is flagged if
+\emph{any} part is too short:
+
+\begin{lstlisting}
+def is_invalid(p):
+    for part in re.split(r"[;,/]", p):
+        if len(nationals(part)) < 8:
+            return True
+    return False
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Result of phone unification.}
+\begin{tabular}{lr}
+\toprule
+Phones with Persian/Arabic digits, before & 2{,}742 \\
+Phones with Persian/Arabic digits, after  & 0 \\
+\textbf{Probably invalid phones} & \textbf{550 of 46{,}490 (1.18\%)} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Typical invalid numbers were cut off after the area code, such as \col{+98 21 5418 5},
+\col{+98 13 3611} and \col{+982123540}. The 15 text-only values are also flagged, because they have no digits.
+
+% =====================================================================
+\section{Step 5: Similarity and Distance}
+
+\subsection{Jaccard similarity of \col{other\_tags} keys}
+
+The Jaccard similarity of two sets is
+\[
+J(A,B) = \frac{|A\cap B|}{|A\cup B|}.
+\]
+As required, it was implemented by hand with Python set operations (\col{\&} for
+intersection, \col{|} for union), without any library function. When both sets are empty,
+the union is empty and the similarity is undefined, so \col{NaN} is returned instead of
+dividing by zero:
+
+\begin{lstlisting}
+def jaccard(a, b):
+    a, b = set(a), set(b)
+    union = a | b
+    if len(union) == 0:          # both empty -> undefined
+        return np.nan
+    return len(a & b) / len(union)
+
+def tag_keys(j):                 # set of keys of the other_tags JSON
+    if pd.isna(j):
+        return set()
+    return set(json.loads(j).keys())
+\end{lstlisting}
+
+A sanity check gives $J(\{a,b,c\},\{b,c,d\}) = 2/4 = 0.5$.
+From the 4{,}747 candidate pairs of Step 3.5, all pairs in which \textbf{both} records have a
+non-empty \col{name} were selected: \textbf{2{,}396 pairs}, far more than the 20 required.
+For each pair \col{tag\_sim} was computed as the Jaccard similarity of the \col{other\_tags}
+key sets. For 772 pairs neither record has any \col{other\_tags}, so \col{tag\_sim} is \col{NaN}.
+
+\subsection{Jaccard similarity of name words}
+
+For the same pairs, each name was turned into a \emph{set of words} by splitting on
+whitespace (e.g.\ \fa{بانک ملی} $\rightarrow$ \{\fa{بانک}, \fa{ملی}\}).
+Before splitting, Arabic \fa{ي}/\fa{ك} were replaced by Persian letters and Latin text was
+lower-cased, so spelling noise does not hide real matches. \col{name\_sim} is the Jaccard
+similarity of the two word sets.
+
+\begin{table}[H]
+\centering
+\caption{A sample of the compared pairs.}
+\begin{tabular}{llcc}
+\toprule
+\col{name\_1} & \col{name\_2} & \col{tag\_sim} & \col{name\_sim} \\
+\midrule
+\fa{بیمارستان شهدای کردیان} & \fa{بیمارستان شهدای کردیان} & 1.00 & 1.00 \\
+\fa{بانک کشاورزی} & \fa{بانک کشاورزی} & 0.00 & 1.00 \\
+\fa{مسجد بلال} & \fa{مسجد بلال} & 0.00 & 1.00 \\
+\fa{نی نی پوش} & \fa{پوشاک ایزدی} & 1.00 & 0.00 \\
+\fa{دکتر محمدرضا اهتمام} & \fa{دکتر لیلا توکلی} & 1.00 & 0.20 \\
+\fa{بانک تجارت} & \fa{بانک سپه} & 0.50 & 0.33 \\
+\fa{بونیک مارکت شعبه 1 اندیشه} & \fa{بونیک مارکت شعبه 2 اندیشه} & 1.00 & 0.67 \\
+\fa{پارک شهدا} & \fa{پارک مردم)(شهدا)} & NaN & 0.33 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Do pairs with high tag similarity also have high name similarity?}
+\textbf{No.} The two measures are practically unrelated:
+
+\begin{table}[H]
+\centering
+\caption{Relation between \col{tag\_sim} and \col{name\_sim}.}
+\begin{tabular}{lr}
+\toprule
+Pearson correlation of \col{tag\_sim} and \col{name\_sim} & $-0.063$ \\
+Mean \col{name\_sim} when \col{tag\_sim} $\geq 0.8$ & 0.30 \\
+Mean \col{name\_sim} when \col{tag\_sim} $< 0.8$ & 0.32 \\
+\bottomrule
+\end{tabular}
+\hspace{0.6cm}
+\begin{tabular}{lcc}
+\toprule
+ & name $\leq 0.5$ & name $> 0.5$ \\
+\midrule
+tag $< 0.5$    & 502 & 167 \\
+tag $\geq 0.5$ & 788 & 167 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{figures/sim_scatter.png}
+\caption{Tag similarity versus name similarity (one point per pair). There is no diagonal
+trend. The points form vertical stripes at simple fractions (0, 1/3, 1/2, 2/3, 1) because the
+tag key sets are very small.}
+\end{figure}
+
+\paragraph{Pairs on which the two measures disagree.}
+\begin{enumerate}
+  \item \textbf{Same name, tag similarity 0 (93 pairs).} Example: \fa{اداره پست مرکزی}
+  (node 3303523321 / way 491120128). The node has no \col{other\_tags}, and the way has
+  \col{\{"building:levels": "5"\}}. Another example is \fa{شبکه تلویزیونی پرس تی‌وی}, whose way has
+  \col{building:levels} and \col{operator:wikidata}.
+  These are node + way duplicates: the way (the building polygon) carries
+  \emph{geometry/building} tags that the point does not have. The tag keys describe
+  \emph{how} the object was mapped, not \emph{what} it is, so with one empty set the
+  similarity is 0 even though this is clearly the same place.
+  \item \textbf{Identical tag keys, different names (401 pairs).} Example:
+  \fa{بانک اقتصاد نوین} versus \fa{بانک ایران زمین}. Both have the keys
+  \col{brand:en}, \col{brand:wikidata}, \dots, but with different \emph{values}
+  (EN Bank versus Iran Zamin Bank). Two clinics both tagged \col{healthcare=clinic}
+  and two fast-food shops both tagged \col{delivery}, \col{delivery:partner} behave the same way.
+  Places of the same type get the \emph{same standard set of keys}, often from the same
+  editor preset, and only keys are compared. These are \textbf{different businesses} that happen
+  to be next to each other, which is common in shopping centres and medical buildings.
+\end{enumerate}
+
+\textbf{Conclusion.} The Jaccard similarity of tag \emph{keys} measures how similarly two
+records were \emph{tagged}, not whether they are the same place. The Jaccard similarity of name
+words is a much more reliable signal for duplicate detection.
+
+\subsection{Duplicate threshold}
+
+To choose a threshold, the name similarities were divided into bands, and the borderline
+band was checked by hand:
+
+\begin{table}[H]
+\centering
+\caption{Distribution of \col{name\_sim} over the 2{,}396 named pairs.}
+\begin{tabular}{lr}
+\toprule
+\col{name\_sim} band & \textbf{Pairs} \\
+\midrule
+$< 0.5$            & 1{,}749 \\
+0.5 -- 0.65        & 115 \\
+0.66 -- 0.99       & 66 \\
+1 (same words)     & 466 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Examples from the borderline band 0.5--0.65.}
+\begin{tabular}{llcc}
+\toprule
+\col{name\_1} & \col{name\_2} & \col{tag\_sim} & \col{name\_sim} \\
+\midrule
+\fa{طلا و جواهر اکسید} & \fa{طلا و جواهر تک} & 1.0 & 0.6 \\
+\fa{مطب دکتر اصغری} & \fa{مطب دکتر سخاوت‌فر} & 1.0 & 0.5 \\
+\fa{آش سرای برق} & \fa{کباب سرای برق} & 0.0 & 0.5 \\
+\fa{اغذیه ی پونک} & \fa{اغذیه ی آوین} & NaN & 0.5 \\
+\fa{آزمایشگاه بابک} & \fa{آزمایشگاه تشخیص پزشکی بابک} & 0.0 & 0.5 \\
+\fa{مسجد نقویه} & \fa{مسجد و حسینیه نقویه} & NaN & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This band is mostly \textbf{false positives}. Different shops share generic words such as
+\fa{طلا و جواهر} (jewellery) or \fa{مطب دکتر} (doctor's office), while the distinctive
+part of the name differs. Only a few pairs are true duplicates (the laboratory and mosque
+examples). From about two-thirds of shared words upward, the pairs are mostly the same place.
+
+\medskip
+\noindent\fbox{\parbox{0.97\textwidth}{\textbf{Proposed rule.} Two candidate records (same
+location rounded to 4 decimals and same \col{main\_value}) are considered ``very probably the same real place''
+when
+\[
+\text{name\_sim} \;\geq\; 0.66 ,
+\]
+i.e.\ at least about two-thirds of the name words are shared. \col{tag\_sim} is \emph{not}
+used, because it is uncorrelated with real identity and would reject the true node + way
+duplicates (whose \col{tag\_sim} is 0).}}
+
+\medskip
+\noindent\textbf{Result: 532 of the 2{,}396 pairs} are marked as duplicates, involving
+\textbf{1{,}014 records}. Because words are compared as sets, a change in word order is also
+detected (\fa{آنلاین موبایل} $\equiv$ \fa{موبایل آنلاین}).
+\emph{Limitation:} very generic names such as \fa{آلاچیق} (shelter) give
+$\text{name\_sim}=1$ even for two different shelters a few metres apart. A stricter rule
+could also require a minimum name length or a distance in metres.
+
+% =====================================================================
+\section{Step 6: Descriptive Statistics, Visualization and OLAP}
+
+\subsection{Frequency and mode of \col{main\_value} within each \col{main\_key}}
+
+\begin{table}[H]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Mode of \col{main\_value} in each category.}
+\begin{tabular}{lrrlrrl}
+\toprule
+\col{main\_key} & \textbf{Records} & \textbf{Distinct} & \textbf{Mode} & \textbf{Count} & \textbf{\%} & \textbf{Top 3} \\
+\midrule
+amenity    & 138{,}493 & 257 & place\_of\_worship & 17{,}810 & 12.9 & place\_of\_worship, school, bank \\
+shop       & 72{,}122  & 543 & supermarket        & 7{,}667  & 10.6 & supermarket, bakery, car\_repair \\
+leisure    & 42{,}320  & 56  & park               & 20{,}097 & 47.5 & park, pitch, garden \\
+office     & 25{,}972  & 181 & government         & 9{,}389  & 36.2 & government, company, estate\_agent \\
+tourism    & 12{,}220  & 30  & hotel              & 2{,}577  & 21.1 & hotel, attraction, information \\
+craft      & 3{,}911   & 107 & photographer       & 366      & 9.4  & photographer, electronics\_repair, carpenter \\
+healthcare & 2{,}114   & 34  & laboratory         & 957      & 45.3 & laboratory, yes, physiotherapist \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{The 10 most frequent \col{amenity} types.}
+\begin{tabular}{lr@{\hspace{1.2cm}}lr}
+\toprule
+place\_of\_worship & 17{,}810 & fuel     & 5{,}721 \\
+school             & 16{,}267 & clinic   & 4{,}692 \\
+bank               & 11{,}943 & shelter  & 4{,}646 \\
+parking            & 9{,}699  & cafe     & 4{,}517 \\
+restaurant         & 9{,}006  & pharmacy & 4{,}425 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+  \item The most frequent type of \textbf{amenity} is \textbf{place\_of\_worship} (17{,}810, 12.9\%),
+  followed by school and bank.
+  \item \col{leisure} and \col{healthcare} are dominated by their mode: park makes up almost
+  half of leisure, and laboratory 45\% of healthcare.
+  \item \col{shop} (543 distinct values) and \col{amenity} (257) are very diverse.
+  \item The value \col{yes} among the top healthcare types (\col{healthcare=yes}) is another
+  quality issue: the mapper did not say what kind of healthcare place it is.
+\end{itemize}
+
+\subsection{Percentiles of \col{hub\_km}}
+
+\begin{table}[H]
+\centering
+\caption{Percentiles of \col{hub\_km}.}
+\begin{tabular}{cccc}
+\toprule
+$P_{25}$ & $P_{50}$ & $P_{75}$ & $P_{90}$ \\
+\midrule
+5.00 km & 14.99 km & 69.98 km & 120.95 km \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Half of all POIs lie within 15\,km of an approximate provincial center. This shows that OSM
+coverage is concentrated in and around the big cities. The distribution is strongly
+right-skewed (mean 45.3\,km is much larger than the median of 15\,km).
+
+\textbf{Records farther than 300\,km: 2{,}300 (0.77\%).}
+
+\begin{table}[H]
+\centering
+\caption{Records with \col{hub\_km} $>300$.}
+\begin{tabular}{lr@{\hspace{1.5cm}}lr}
+\toprule
+\col{nearest\_hub} & \textbf{Count} & \col{addr:city} (top) & \textbf{Count} \\
+\midrule
+Zahedan     & 1{,}784 & \fa{نیک شهر}   & 49 \\
+BandarAbbas & 515     & \fa{چابهار}    & 20 \\
+Ardabil     & 1       & \fa{شهر چابهار} & 10 \\
+            &         & \fa{مخت}       & 6 \\
+            &         & \fa{قصرقند}    & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{figures/far_map.png}
+\caption{All records (lon/lat), with the records more than 300\,km from their nearest hub in red.}
+\end{figure}
+
+\textbf{Where are they?} The far-away records have a median latitude of 25.99 and a median
+longitude of 60.63 (interquartile ranges 25.35--26.38 and 60.20--61.14). This is
+\textbf{southern Sistan and Baluchestan} along the Makran coast (Chabahar, Nikshahr, Konarak,
+Qasr-e Qand). This area is very far from every hub in the list: Zahedan is in the far north
+of that large province, and Bandar Abbas is in the next province to the west. The result
+comes from using straight-line distance to a few approximate centers instead of real
+administrative boundaries. One record (nearest hub Ardabil) has latitude $\approx 43$,
+which is outside Iran's borders: either a coordinate error or a point outside the country in
+the extract.
+
+\subsection{Plots}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/year_hist.png}
+\caption{Histogram of the year of \col{edit\_date}.}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{Number of records per edit year.}
+\begin{tabular}{*{10}{c}}
+\toprule
+2007 & 2008 & 2009 & 2010 & 2011 & 2012 & 2013 & 2014 & 2015 & 2016 \\
+3 & 6 & 11 & 221 & 376 & 389 & 661 & 1{,}580 & 2{,}835 & 11{,}966 \\
+\midrule
+2017 & 2018 & 2019 & 2020 & 2021 & 2022 & 2023 & 2024 & 2025 & 2026 \\
+21{,}156 & 21{,}921 & 32{,}808 & 18{,}109 & 24{,}011 & 26{,}366 & 44{,}647 & 38{,}500 & 35{,}096 & 16{,}490 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation.} OSM coverage of Iran grew in stages:
+\begin{itemize}
+  \item there are almost no records before 2010;
+  \item growth is slow until 2015;
+  \item there is a jump in \textbf{2016} (about 12k), then 20k--45k records per year, with a peak in \textbf{2023} (44{,}647);
+  \item the dip in 2020 matches the COVID year;
+  \item 2026 is lower because the year was not finished when the snapshot was taken.
+\end{itemize}
+\emph{Caveat:} \col{edit\_date} is the date of the \emph{last} edit, not of creation. A place
+created in 2012 and edited in 2023 is counted in 2023, so the histogram is shifted toward
+recent years and shows mapping \emph{activity} rather than pure creation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/hub_boxplot.png}
+\caption{Boxplot of \col{hub\_km} for the five most frequent \col{nearest\_hub} values.}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{\col{hub\_km} statistics for the five most frequent hubs.}
+\begin{tabular}{lrrrrrrr}
+\toprule
+\col{nearest\_hub} & \textbf{Count} & \textbf{Mean} & \textbf{Std} & \textbf{25\%} & \textbf{50\%} & \textbf{75\%} & \textbf{Max} \\
+\midrule
+Tehran  & 60{,}730 & 13.5 & 14.0 & 5.8 & 9.8  & 13.9 & 119.8 \\
+Isfahan & 21{,}433 & 23.4 & 29.8 & 3.6 & 9.4  & 30.4 & 193.4 \\
+Shiraz  & 21{,}406 & 47.0 & 65.8 & 6.1 & 10.7 & 60.4 & 285.4 \\
+Karaj   & 17{,}876 & 30.4 & 31.2 & 6.9 & 18.7 & 40.8 & 104.8 \\
+Mashhad & 16{,}375 & 38.8 & 53.4 & 4.1 & 9.3  & 71.4 & 263.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation.}
+\begin{itemize}
+  \item \textbf{Tehran} has the most records and the most compact distribution (median 9.8\,km,
+  IQR 5.8--13.9\,km), because the region is small and densely mapped.
+  \item \textbf{Shiraz} and \textbf{Mashhad} have a similar median (about 10\,km) but much longer
+  boxes and whiskers ($P_{75}\approx 60$--$71$\,km, maximum 263--285\,km), because they serve
+  large provinces with many distant towns.
+  \item \textbf{Karaj} has the highest median (18.7\,km), because it takes in the many suburbs
+  between Tehran and Qazvin.
+  \item All five distributions are right-skewed, with many outliers above the upper whisker.
+\end{itemize}
+
+\subsection{Data cube and OLAP operations}
+
+A data cube with three dimensions, \textbf{\col{nearest\_hub} $\times$ \col{main\_key}
+$\times$ year of \col{edit\_date}}, was built. Each cell holds the \textbf{number of records}.
+It is stored as a pandas Series with a three-level MultiIndex. Only non-empty cells are kept,
+which suits a sparse cube:
+
+\begin{lstlisting}
+df["year"] = pd.to_datetime(df["edit_date"]).dt.year
+cube = df.groupby(["nearest_hub", "main_key", "year"]).size()
+\end{lstlisting}
+
+Only \textbf{2{,}722 of the 4{,}340} possible cells (31 hubs $\times$ 7 categories $\times$ 20
+years) are non-empty, so the cube is about 37\% empty, mainly because of the early years and
+the rare categories in small hubs.
+
+\paragraph{Roll-up (remove the year dimension).}
+\begin{lstlisting}
+rollup = cube.groupby(level=["nearest_hub", "main_key"]).sum().unstack(fill_value=0)
+\end{lstlisting}
+
+\begin{table}[H]
+\centering\small
+\caption{Roll-up: records per hub and category over all years (top 10 hubs).}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\col{nearest\_hub} & amenity & craft & healthcare & leisure & office & shop & tourism & \textbf{total} \\
+\midrule
+Tehran      & 26{,}145 & 792 & 778 & 9{,}802 & 6{,}156 & 15{,}768 & 1{,}289 & \textbf{60{,}730} \\
+Isfahan     & 9{,}562  & 387 & 128 & 2{,}758 & 1{,}677 & 5{,}818  & 1{,}103 & \textbf{21{,}433} \\
+Shiraz      & 8{,}607  & 242 & 134 & 2{,}731 & 1{,}807 & 7{,}210  & 675     & \textbf{21{,}406} \\
+Karaj       & 7{,}215  & 435 & 111 & 2{,}994 & 1{,}817 & 4{,}834  & 470     & \textbf{17{,}876} \\
+Mashhad     & 7{,}257  & 209 & 113 & 1{,}901 & 1{,}289 & 4{,}445  & 1{,}161 & \textbf{16{,}375} \\
+Tabriz      & 6{,}505  & 172 & 76  & 1{,}329 & 1{,}111 & 2{,}712  & 482     & \textbf{12{,}387} \\
+Sari        & 4{,}593  & 166 & 50  & 924     & 886     & 3{,}282  & 364     & \textbf{10{,}265} \\
+Rasht       & 4{,}257  & 123 & 61  & 671     & 853     & 3{,}013  & 594     & \textbf{9{,}572} \\
+BandarAbbas & 4{,}783  & 120 & 41  & 1{,}297 & 707     & 2{,}074  & 550     & \textbf{9{,}572} \\
+Arak        & 4{,}616  & 138 & 25  & 1{,}310 & 731     & 2{,}280  & 422     & \textbf{9{,}522} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textit{Question answered:} ``Over all years, how many POIs of each category does each
+hub region have?'' The Tehran region is far ahead (60{,}730, about three times Isfahan or Shiraz),
+and \col{amenity} is the largest category in every hub.
+
+\paragraph{Drill-down (Tehran / \col{leisure} $\rightarrow$ \col{main\_value}).}
+A finer cube that also has the \col{main\_value} level under \col{main\_key} was built, and
+the cell (Tehran, leisure) was opened:
+
+\begin{lstlisting}
+cube_detail = df.groupby(["nearest_hub", "main_key", "main_value", "year"]).size()
+tehran_leisure = cube_detail.loc[("Tehran", "leisure")].groupby(level="main_value").sum()
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Drill-down: sub-types of the 9{,}802 \col{leisure} records in Tehran (top 10).}
+\begin{tabular}{lr@{\hspace{1.2cm}}lr}
+\toprule
+park          & 3{,}490 & playground       & 527 \\
+garden        & 2{,}252 & fitness\_centre  & 254 \\
+pitch         & 1{,}745 & stadium          & 70 \\
+swimming\_pool & 703    & fitness\_station & 43 \\
+sports\_centre & 538    & amusement\_arcade & 41 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textit{Question answered:} ``What does leisure in Tehran actually consist of?''
+It is mainly parks, gardens and sports pitches (together 76\%), followed by swimming pools,
+sports centres and playgrounds.
+
+\paragraph{Selection (\col{nearest\_hub} = Tehran).}
+\begin{lstlisting}
+tehran_slice = cube.xs("Tehran", level="nearest_hub")
+tehran_dist = tehran_slice.groupby(level="main_key").sum()
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Selection: category distribution inside the Tehran region compared with all of Iran.}
+\begin{tabular}{lrrr}
+\toprule
+\col{main\_key} & \textbf{Count} & \textbf{Tehran \%} & \textbf{Whole Iran \%} \\
+\midrule
+amenity    & 26{,}145 & 43.1 & 46.61 \\
+shop       & 15{,}768 & 26.0 & 24.27 \\
+leisure    & 9{,}802  & 16.1 & 14.24 \\
+office     & 6{,}156  & 10.1 & 8.74 \\
+tourism    & 1{,}289  & 2.1  & 4.11 \\
+craft      & 792      & 1.3  & 1.32 \\
+healthcare & 778      & 1.3  & 0.71 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textit{Question answered:} ``How are the POI categories distributed in the Tehran region,
+and how does that compare with the whole country?'' \col{amenity} is still the largest share
+(43.1\%). Compared with all of Iran, Tehran has relatively more \col{shop}, \col{leisure},
+\col{office} and especially \col{healthcare} (1.3\% vs 0.71\%), and about half the share of
+\col{tourism} (2.1\% vs 4.11\%). This fits a capital that is a business and medical center
+rather than a tourist destination.
+
+% =====================================================================
+\section{Problems Encountered and Solutions}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Problem} & \textbf{Solution} \\
+\midrule
+pandas would auto-convert \col{phone}/\col{capacity} and lose leading \col{0} and \col{+}.
+& Read these columns with \col{dtype=str}. \\
+Persian (\fa{۰}--\fa{۹}) and Arabic-Indic digits in numeric fields.
+& One \col{str.maketrans} table that maps both to Latin digits. \\
+Arabic \fa{ي}/\fa{ك} versus Persian \fa{ی}/\fa{ک}.
+& Replaced before comparing cities and names. \\
+A city written in many forms (\col{Tehran}, \fa{شهر تهران}, \dots).
+& Whitespace collapsing, lower-casing, removing the \fa{شهر} prefix, Latin$\rightarrow$Persian
+dictionary (2{,}525 $\rightarrow$ 2{,}281). \\
+Substring search for Tehran also matched other places (\fa{تهرانسر}).
+& For the normalization, only exact rules and a dictionary were used, not substring matching. \\
+Several phone numbers in one field.
+& Split on \col{;} \col{,} \col{/} and check every part. \\
+Different country-code / trunk-prefix conventions.
+& \col{nationals()} reduces every number to its national significant digits before the length check. \\
+The self-join produced self-pairs and mirrored pairs.
+& Keep only rows with \col{index\_1 < index\_2}. \\
+Jaccard of two empty tag sets (0/0).
+& Return \col{NaN} instead of dividing by zero. \\
+Tag-key similarity turned out to be uninformative for duplicates.
+& The duplicate threshold uses name-word similarity only. \\
+Mixed integers and missing values in \col{capacity}.
+& The nullable integer dtype \col{Int64}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Use of Large Language Models}
+
+An LLM (Claude) was used to add explanatory Markdown cells and code
+comments to the notebook, and to draft the text and layout of this \LaTeX{} report from the
+notebook's code and outputs. All numbers in the report come directly from the
+outputs of the notebook.
+
+% =====================================================================
+\section{Conclusion}
+
+The audit confirms that \col{iran\_poi\_raw.csv} has the typical problems of volunteered
+geographic information:
+\begin{itemize}
+  \item free-text fields with many spellings for the same thing (2{,}525 city values);
+  \item mixed Persian/Arabic characters and digits;
+  \item numeric fields that contain text, units, negative values and placeholders;
+  \item phone numbers in at least nine formats;
+  \item thousands of near-duplicate records, mostly from mapping a place both as a point and as a building.
+\end{itemize}
+Simple, explicit rules were enough to fix a large part of this:
+\begin{itemize}
+  \item character and digit unification and a city dictionary;
+  \item a strict integer parser for \col{capacity};
+  \item a length rule for phones;
+  \item a hand-written Jaccard similarity on name words, which flagged 532 duplicate pairs.
+\end{itemize}
+The descriptive and OLAP analysis shows a dataset concentrated around a few big cities
+(especially Tehran) and growing quickly since 2016. Any regional conclusion depends on the
+approximate, distance-based \col{nearest\_hub} assignment and not on official boundaries.
+
+\end{document}

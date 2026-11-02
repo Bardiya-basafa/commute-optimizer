@@ -1,0 +1,125 @@
+(.venv) bardiya@bardiya ~/m/u/H/commute-optimizer (main)> python main.py --algo all --seed 42 --map data/maps/metropolis_graph.json --scenario
+ data/scenarios/rush_hour.json
+
+======================================================================
+ COMMUTE LOCAL SEARCH OPTIMIZATION BENCHMARK
+ Network Origin: Home | Destination: Uni
+ Time Domain: 420.0m to 600.0m (Step: 5.0m)
+======================================================================
+
+>> Running: Hill Climbing ...
+   [Done in 0.063s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 31.00 minutes
+   Optimal Route    : Home -> C1 -> C2 -> B2 -> Uni
+
+>> Running: Simulated Annealing ...
+   [Done in 0.313s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 31.00 minutes
+   Optimal Route    : Home -> C1 -> C2 -> B2 -> Uni
+
+>> Running: Local Beam Search ...
+   [Done in 0.005s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 31.00 minutes
+   Optimal Route    : Home -> C1 -> C2 -> B2 -> Uni
+
+>> Running: Genetic Algorithm ...
+   [Done in 1.254s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 31.00 minutes
+   Optimal Route    : Home -> C1 -> C2 -> B2 -> Uni
+
+======================================================================
+ BENCHMARK SUMMARY
+======================================================================
+ * Hill Climbing          :  31.00 min | Depart: 07:00 | Path: Home -> C1 -> C2 -> B2 -> Uni
+ * Simulated Annealing    :  31.00 min | Depart: 07:00 | Path: Home -> C1 -> C2 -> B2 -> Uni
+ * Local Beam Search      :  31.00 min | Depart: 07:00 | Path: Home -> C1 -> C2 -> B2 -> Uni
+ * Genetic Algorithm      :  31.00 min | Depart: 07:00 | Path: Home -> C1 -> C2 -> B2 -> Uni
+======================================================================
+
+(.venv) bardiya@bardiya ~/m/u/H/commute-optimizer (main)> python main.py --algo all --seed 42 --map data/maps/megacity.json --scenario data/scenarios/rush_hour.json
+
+======================================================================
+ COMMUTE LOCAL SEARCH OPTIMIZATION BENCHMARK
+ Network Origin: Home | Destination: Uni
+ Time Domain: 420.0m to 600.0m (Step: 5.0m)
+======================================================================
+
+>> Running: Hill Climbing ...
+   [Done in 0.836s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 88.60 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Simulated Annealing ...
+   [Done in 5.357s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 88.60 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Local Beam Search ...
+   [Done in 0.067s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 88.60 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Genetic Algorithm ...
+   [Done in 11.976s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 88.60 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+======================================================================
+ BENCHMARK SUMMARY
+======================================================================
+ * Hill Climbing          :  88.60 min | Depart: 07:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Simulated Annealing    :  88.60 min | Depart: 07:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Local Beam Search      :  88.60 min | Depart: 07:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Genetic Algorithm      :  88.60 min | Depart: 07:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+======================================================================
+
+(.venv) bardiya@bardiya ~/m/u/H/commute-optimizer (main)> python main.py --algo all --seed 42 --map data/maps/megacity.json --scenario data/scenarios/megacity_rush.json 
+
+======================================================================
+ COMMUTE LOCAL SEARCH OPTIMIZATION BENCHMARK
+ Network Origin: Home | Destination: Uni
+ Time Domain: 420.0m to 600.0m (Step: 5.0m)
+======================================================================
+
+>> Running: Hill Climbing ...
+   [Done in 1.223s]
+   Optimal Departure: 10:00 (600.0m)
+   Total Travel Time: 89.50 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R2C1 -> R3C1 -> R4C1 -> R5C1 -> R7C3 -> R8C3 -> R9C3 -> R9C4 -> R10C4 -> R10C5 -> R10C6 -> R10C7 -> R10C8 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Simulated Annealing ...
+   [Done in 4.896s]
+   Optimal Departure: 07:00 (420.0m)
+   Total Travel Time: 136.31 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Local Beam Search ...
+   [Done in 0.795s]
+   Optimal Departure: 10:00 (600.0m)
+   Total Travel Time: 91.20 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R4C8 -> R4C9 -> R4C10 -> R5C10 -> R6C10 -> R7C10 -> R8C10 -> R9C10 -> R9C11 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+>> Running: Genetic Algorithm ...
+   [Done in 10.338s]
+   Optimal Departure: 10:00 (600.0m)
+   Total Travel Time: 88.60 minutes
+   Optimal Route    : Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+
+======================================================================
+ BENCHMARK SUMMARY
+======================================================================
+ * Hill Climbing          :  89.50 min | Depart: 10:00 | Path: Home -> R0C1 -> R1C1 -> R2C1 -> R3C1 -> R4C1 -> R5C1 -> R7C3 -> R8C3 -> R9C3 -> R9C4 -> R10C4 -> R10C5 -> R10C6 -> R10C7 -> R10C8 -> R10C9 -> R10C10-> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Simulated Annealing    : 136.31 min | Depart: 07:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Local Beam Search      :  91.20 min | Depart: 10:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R4C8 -> R4C9 -> R4C10 -> R5C10 -> R6C10 -> R7C10 -> R8C10 -> R9C10 -> R9C11 -> R10C11 -> R10C12 -> R11C12 -> Uni
+ * Genetic Algorithm      :  88.60 min | Depart: 10:00 | Path: Home -> R0C1 -> R1C1 -> R1C2 -> R1C3 -> R1C4 -> R3C6 -> R3C7 -> R4C7 -> R5C7 -> R6C7 -> R7C7 -> R8C7 -> R9C7 -> R9C8 -> R9C9 -> R10C9 -> R10C10 -> R10C11 -> R10C12 -> R11C12 -> Uni
+======================================================================
+
+(.venv) bardiya@bardiya ~/m/u/H/commute-optimizer (main)> 
