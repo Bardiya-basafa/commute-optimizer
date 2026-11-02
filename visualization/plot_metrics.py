@@ -22,7 +22,7 @@ def plot_convergence(
         save_path: Optional output path to save PNG/PDF figure.
         show: Whether to display interactive plot window.
     """
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(14, 6))
     ax = plt.gca()
 
     palette = {
@@ -37,17 +37,25 @@ def plot_convergence(
             continue
         color = palette.get(algo_name, None)
         iterations = list(range(1, len(cost_history) + 1))
-        plt.plot(
+        # Step plot: best-so-far only changes at discrete steps.
+        # Markers on short runs (e.g. beam search) so they don't vanish at x≈1.
+        plt.step(
             iterations,
             cost_history,
-            label=algo_name,
+            where="post",
+            label=f"{algo_name} ({cost_history[-1]:.2f} min)",
             linewidth=2.2,
             alpha=0.9,
-            color=color
+            color=color,
+            marker="o" if len(cost_history) <= 30 else None,
+            markersize=4
         )
 
-    plt.xlabel("Iteration / Generation Step", fontsize=11, fontweight="bold")
-    plt.ylabel("Commute Duration $f(x)$ (minutes)", fontsize=11, fontweight="bold")
+    # Log x-axis: solvers run for very different step counts (beam ~10, SA ~1500),
+    # and most of the improvement happens in the first few steps.
+    ax.set_xscale("log")
+    plt.xlabel("Iteration / Generation Step (log scale)", fontsize=11, fontweight="bold")
+    plt.ylabel("Commute Duration $f(x)$ (minutes)", fontsize=11, fontweight="bold",rotation=0)
     plt.title(title, fontsize=13, fontweight="bold")
     plt.grid(True, linestyle="--", alpha=0.6)
     plt.legend(frameon=True, facecolor="white", framealpha=0.9, loc="upper right")

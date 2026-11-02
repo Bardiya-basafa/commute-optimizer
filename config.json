@@ -2,9 +2,9 @@
   "problem": {
     "origin": "Home",
     "destination": "Uni",
-    "t_min": 465.0,
-    "t_max": 525.0,
-    "t_step": 5.0
+    "t_min": 420.0,
+    "t_max": 1000.0,
+    "t_step": 20.0
   },
   "hill_climbing": {
     "max_sideways": 100,

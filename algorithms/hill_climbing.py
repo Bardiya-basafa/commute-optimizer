@@ -3,9 +3,6 @@ algorithms/hill_climbing.py
 Hill Climbing search with sideways move limits and random restarts.
 """
 
-from collections import deque
-import math
-import random
 from typing import List, Tuple
 from algorithms.base import LocalSearchSolver, Tracker, EPS
 from core.state import State
@@ -19,7 +16,6 @@ class HillClimbingSolver(LocalSearchSolver):
         self.max_sideways: int = self.params.get("max_sideways", 100)
         self.max_restarts: int = self.params.get("max_restarts", 5)
         self.max_steps: int = self.params.get("max_steps", 500)
-        self.rng = random.Random()
 
     def solve(self) -> Tuple[State, float]:
         """
@@ -38,16 +34,18 @@ class HillClimbingSolver(LocalSearchSolver):
         tr = Tracker(self.problem)
         f = self.problem.evaluate
 
-        for restart in range(self.max_restarts):
+        for restart in range(self.max_restarts + 1):
             cur = (
                 self.problem.generate_initial_state()
                 if restart == 0
                 else random_state(self.problem, self.rng)
             )
             cur_cost = f(cur)
+            tr.offer(cur, cur_cost)
+            tr.tick()
 
             sideways_left = self.max_sideways
-            tabu = deque([cur])
+            tabu = {cur}  # states visited in this climb (prevents plateau ping-pong)
             for _ in range(self.max_steps):
                 cand = [n for n in get_neighbors(cur, self.problem) if n not in tabu]
                 if not cand:
@@ -65,7 +63,8 @@ class HillClimbingSolver(LocalSearchSolver):
                 else:
                     break
 
-                tabu.append(cur)
+                tabu.add(cur)
                 tr.offer(cur, cur_cost)
                 tr.tick()
+        self.history = tr.history
         return tr.result()

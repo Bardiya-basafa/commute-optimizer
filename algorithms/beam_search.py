@@ -3,9 +3,7 @@ algorithms/beam_search.py
 Local Beam Search maintaining K parallel candidate states.
 """
 
-from ast import List
-import random
-from typing import Tuple
+from typing import Dict, List, Tuple
 from algorithms.base import LocalSearchSolver, Tracker, EPS
 from core.state import State
 from core.problem import CommuteProblem
@@ -20,11 +18,13 @@ class LocalBeamSearchSolver(LocalSearchSolver):
 
     def distinct_random_states(self) -> List[State]:
         out = [self.problem.generate_initial_state()]
-        while len(out) < self.beam_width:
+        attempts = 0
+        # Attempt cap: a tiny map may have fewer than beam_width distinct states.
+        while len(out) < self.beam_width and attempts < 100 * self.beam_width:
+            attempts += 1
             s = random_state(self.problem, self.rng)
             if s not in out:
                 out.append(s)
-
         return out
 
     def solve(self) -> Tuple[State, float]:
@@ -44,27 +44,46 @@ class LocalBeamSearchSolver(LocalSearchSolver):
         Prohibited:
         - Treating this as K independent, non-communicating searches.
         """
-        # TODO: Implement Local Beam Search
         f = self.problem.evaluate
         tr = Tracker(self.problem)
+        cost: Dict[State, float] = {}  # memoised f(x): each state is evaluated once
+
+        def c(s: State) -> float:
+            if s not in cost:
+                cost[s] = f(s)
+            return cost[s]
+
         beam = self.distinct_random_states()
         for s in beam:
-            tr.offer(s, f(s))
+            tr.offer(s, c(s))
+        tr.tick()
+
         for _ in range(self.max_iterations):
             pool = set(beam)
             for s in beam:
                 pool.update(get_neighbors(s, self.problem))
-            ranked = sorted(pool, key=f)
+            ranked = sorted(pool, key=c)
 
-            new_beam, per_path = [], {}
+            # Diversity: first take the best state of each *distinct path*, and only
+            # then fill remaining slots with same-path/different-time variants.
+            # Stops the beam collapsing onto one route at K adjacent departure times.
+            new_beam, seen_paths, rest = [], set(), []
             for s in ranked:
-                if len(new_beam) == self.beam_width:
-                    break
-                new_beam.append(s)
+                if s.path not in seen_paths and len(new_beam) < self.beam_width:
+                    new_beam.append(s)
+                    seen_paths.add(s.path)
+                else:
+                    rest.append(s)
+            new_beam += rest[: self.beam_width - len(new_beam)]
+            new_beam.sort(key=c)
 
             for s in new_beam:
-                tr.offer(s, f(s))
-            beam = new_beam
+                tr.offer(s, c(s))
             tr.tick()
 
+            if set(new_beam) == set(beam):  # beam stopped changing -> converged
+                break
+            beam = new_beam
+
+        self.history = tr.history
         return tr.result()

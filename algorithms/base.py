@@ -19,11 +19,11 @@ class Tracker:
         self.problem = problem
         self.best, self.best_cost = None, math.inf
         self.history: List[float] = []
-        self.fount_at = 0
+        self.found_at = 0
 
     def offer(self, s: State, c: float) -> None:
         if c < self.best_cost - EPS:
-            self.best, self.best_cost, self.fount_at = s, c, len(self.history)
+            self.best, self.best_cost, self.found_at = s, c, len(self.history)
 
     def tick(self) -> None:
         self.history.append(self.best_cost)
@@ -37,9 +37,8 @@ class LocalSearchSolver(ABC):
         self.problem = problem
         self.params: Dict[str, Any] = kwargs
         self.history: List[float] = []
-        self.rng = random.Random()
-    
-    
+        # Derived from the global RNG so `main.py --seed N` makes runs reproducible.
+        self.rng = random.Random(random.random())
 
     @abstractmethod
     def solve(self) -> Tuple[State, float]:

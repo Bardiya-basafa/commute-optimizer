@@ -111,10 +111,10 @@ def get_neighbors(s: State, problem: CommuteProblem) -> List[State]:
     return out
 
 
-def blend_time(t1: float, t2: float, problem: CommuteProblem) -> float:
+def blend_time(t1: float, t2: float, problem: CommuteProblem, rng: random.Random) -> float:
     """Random point between the two parents' departure times, snapped to the grid."""
     lo, hi = min(t1, t2), max(t1, t2)
-    return snap_time(random.uniform(lo, hi), problem)
+    return snap_time(rng.uniform(lo, hi), problem)
 
 
 def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: random.Random) -> State:
@@ -142,7 +142,7 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: rand
         State: A newly generated child State.
     """
     p1, p2 = parent1.path, parent2.path
-    t = blend_time(parent1.departure_time, parent2.departure_time, problem)
+    t = blend_time(parent1.departure_time, parent2.departure_time, problem, rng)
 
     # Shared intermediate junctions (origin/destination are trivially shared).
     pos2 = {node: k for k, node in enumerate(p2)}
@@ -197,10 +197,10 @@ def random_path(
 
 
 def random_state(problem: CommuteProblem, rng: random.Random) -> State:
-    """random_path + a random time from problem.time_domain()."""
+    """random_path + a random time from problem.get_valid_time_domain()."""
     path = random_path(problem=problem, rng=rng)
 
     if path is None:
-        return problem.initial_state()
+        return problem.generate_initial_state()
 
     return State(path, rng.choice(problem.get_valid_time_domain()))
