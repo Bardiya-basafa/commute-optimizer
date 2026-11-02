@@ -72,7 +72,7 @@ class GeneticAlgorithmSolver(LocalSearchSolver):
                 p1 = self.pick_parent(pop, costs, self.tournament_size)
                 p2 = self.pick_parent(pop, costs, self.tournament_size)
                 child = (
-                    crossover(p1, p2, self.problem, self.rng)
+                    crossover(p1, p2, self.problem)
                     if self.rng.random() < self.crossover_rate
                     else p1
                 )

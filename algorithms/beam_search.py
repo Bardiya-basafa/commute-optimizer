@@ -59,9 +59,10 @@ class LocalBeamSearchSolver(LocalSearchSolver):
         tr.tick()
 
         for _ in range(self.max_iterations):
-            pool = set(beam)
+            # dict, not set: keeps insertion order, so ties rank the same on every run.
+            pool = dict.fromkeys(beam)
             for s in beam:
-                pool.update(get_neighbors(s, self.problem))
+                pool.update(dict.fromkeys(get_neighbors(s, self.problem)))
             ranked = sorted(pool, key=c)
 
             # Diversity: first take the best state of each *distinct path*, and only

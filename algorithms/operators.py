@@ -25,9 +25,10 @@ def snap_time(t: float, problem: CommuteProblem) -> float:
 
 
 def time_moves(s: State, problem: CommuteProblem) -> List[State]:
-    """Same path, departure time shifted by one step earlier / later."""
+    """Same path, departure time shifted earlier / later by each jump in TIME_JUMPS."""
     out = []
     t_start = s.departure_time
+
     for k in (-1, 1):
         t = snap_time(t_start + k * problem.t_step, problem)
         if t != t_start:
@@ -73,7 +74,7 @@ def route_moves(s: State, problem: CommuteProblem) -> List[State]:
     return out
 
 
-def get_neighbors(s: State, problem: CommuteProblem) -> List[State]:
+def get_neighbors(state: State, problem: CommuteProblem) -> List[State]:
     """
     Generates a set of valid neighboring configurations for the current state.
 
@@ -103,21 +104,21 @@ def get_neighbors(s: State, problem: CommuteProblem) -> List[State]:
     Returns:
         List[State]: A list of valid neighboring State objects.
     """
-    seen, out = {s}, []
-    for n in time_moves(s, problem) + route_moves(s, problem):
+    seen, out = {state}, []
+    for n in time_moves(state, problem) + route_moves(state, problem):
         if n not in seen and problem.is_valid_state(n):
             seen.add(n)
             out.append(n)
     return out
 
 
-def blend_time(t1: float, t2: float, problem: CommuteProblem, rng: random.Random) -> float:
+def blend_time(t1: float, t2: float, problem: CommuteProblem) -> float:
     """Random point between the two parents' departure times, snapped to the grid."""
     lo, hi = min(t1, t2), max(t1, t2)
-    return snap_time(rng.uniform(lo, hi), problem)
+    return snap_time(random.uniform(lo, hi), problem)
 
 
-def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: random.Random) -> State:
+def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
     """
     Recombines structural features from two parent configurations into an offspring.
 
@@ -142,7 +143,7 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: rand
         State: A newly generated child State.
     """
     p1, p2 = parent1.path, parent2.path
-    t = blend_time(parent1.departure_time, parent2.departure_time, problem, rng)
+    t = blend_time(parent1.departure_time, parent2.departure_time, problem)
 
     # Shared intermediate junctions (origin/destination are trivially shared).
     pos2 = {node: k for k, node in enumerate(p2)}
@@ -157,14 +158,14 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem, rng: rand
                 candidates.append(child)
 
     if candidates:
-        child = State(rng.choice(candidates), t)
+        child = State(random.choice(candidates), t)
         if problem.is_valid_state(child):
             return child
 
     # Fallback: parents share no usable junction -> mutate one parent.
-    base = State(rng.choice((p1, p2)), t)
+    base = State(random.choice((p1, p2)), t)
     neighbors = get_neighbors(base, problem)
-    return rng.choice(neighbors) if neighbors else base
+    return random.choice(neighbors) if neighbors else base
 
 
 def random_path(

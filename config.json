@@ -3,8 +3,8 @@
     "origin": "Home",
     "destination": "Uni",
     "t_min": 420.0,
-    "t_max": 1000.0,
-    "t_step": 20.0
+    "t_max": 600.0,
+    "t_step": 5.0
   },
   "hill_climbing": {
     "max_sideways": 100,
@@ -25,6 +25,7 @@
     "generations": 120,
     "crossover_rate": 0.85,
     "mutation_rate": 0.25,
-    "elitism": 3
+    "elitism": 3,
+    "tournament_size": 3
   }
 }
